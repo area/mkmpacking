@@ -27,25 +27,28 @@ br.set_handle_refresh(mechanize._http.HTTPRefreshProcessor(), max_time=1)
 br.addheaders = [('User-agent', 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.1) Gecko/2008071615 Fedora/3.0.1-1.fc9 Firefox/3.0.1')]
 
 # The site we will navigate into, handling it's session
-br.open('http://www.magiccardmarket.eu/Senseis_Divining_Top_(Champions_of_Kamigawa).c1p12179.prod')
+def getCardInfo(url):
+	br.open(url)
+	br.select_form(nr=2)
 
-br.select_form(nr=2)
+	br.form["productFilter[idLanguage][]"]=["1"]
+	br.form["productFilter[condition][]"]=["MT", "NM", "EX"]
 
-br.form["productFilter[idLanguage][]"]=["1"]
-br.form["productFilter[condition][]"]=["MT", "NM", "EX"]
+	br.submit()
+	html = br.response().read()
 
-br.submit()
+	soup = BeautifulSoup(html)
+	records=[]
+	rows = soup.findAll("tr", {"class" : re.compile(".* thick hoverator")})
+	for tr in rows:
+		userurl= tr.span.span.a.attrs[0][1]
+		username =  tr.span.span.a.contents[0]
+		price = tr.find("td", {"class" : re.compile("alignRight nowrap.*")}).contents[0].replace(' &#x20AC;','').replace(',','.')
+		record = (username, userurl, price)
+		records.append(record)
 
-html = br.response().read()
+	print records
 
-soup = BeautifulSoup(html)
-records=[]
-rows = soup.findAll("tr", {"class" : re.compile(".* thick hoverator")})
-for tr in rows:
-    userurl= tr.span.span.a.attrs[0][1]
-    username =  tr.span.span.a.contents[0]
-    price = tr.find("td", {"class" : re.compile("alignRight nowrap.*")}).contents[0]
-    record = (username, userurl, price)
-    records.append(record)
 
-print records
+getCardInfo('http://www.magiccardmarket.eu/Senseis_Divining_Top_(Champions_of_Kamigawa).c1p12179.prod')
+
