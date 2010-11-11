@@ -44,7 +44,8 @@ def getCardInfo(url):
 		userurl= tr.span.span.a.attrs[0][1]
 		username =  tr.span.span.a.contents[0]
 		price = tr.find("td", {"class" : re.compile("alignRight nowrap.*")}).contents[0].replace(' &#x20AC;','').replace(',','.')
-		record = (username, userurl, price)
+		countryName=re.search('.*/(.*)\.png', tr.span.span.nextSibling.nextSibling.img.attrs[1][1]).group(1)
+		record = (username, userurl, countryName, price)
 		records.append(record)
 
 	print records
