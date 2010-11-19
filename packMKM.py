@@ -3,6 +3,7 @@ import re
 import mechanize
 import urllib
 import cookielib
+import numpy as np
 
 br=mechanize.Browser()
 
@@ -26,17 +27,43 @@ br.set_handle_refresh(mechanize._http.HTTPRefreshProcessor(), max_time=1)
 # User-Agent (this is cheating, ok?)
 br.addheaders = [('User-agent', 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.1) Gecko/2008071615 Fedora/3.0.1-1.fc9 Firefox/3.0.1')]
 
-# The site we will navigate into, handling it's session
+def getShipping(country, value, number, insurance):
+	if (value > 25 or (insurance ==False and value > 10)):
+		insured = true
+
+	if (country=="DL"):
+		if (insured):
+			if (number<=16):
+				return 3.6
+			elif (number <=186):
+				return 5.9
+			elif (number<=399):
+				return 8.55
+			else:
+				die("How many freaking cards are you buying!?!")
+		else:
+			if (number<=4):
+				return 1
+			elif (number<=16):
+				return 1.55
+			elif (number<=186):
+				return 3.80
+			else:
+				die("How many cards!?")
+	else:
+		return 3.6
+
+
 def getCardInfo(url):
 	br.open(url)
-	br.select_form(nr=2)
+	#br.select_form(nr=2)
 
-	br.form["productFilter[idLanguage][]"]=["1"]
-	br.form["productFilter[condition][]"]=["MT", "NM", "EX"]
+	#br.form["productFilter[idLanguage][]"]=["1"]
+	#br.form["productFilter[condition][]"]=["MT", "NM", "EX"]
 
-	br.submit()
-	html = br.response().read()
-
+	#br.submit()
+	#html = br.response().read()
+	html = br.response()
 	soup = BeautifulSoup(html)
 	records=[]
 	rows = soup.findAll("tr", {"class" : re.compile(".* thick hoverator")})
@@ -45,11 +72,93 @@ def getCardInfo(url):
 		username =  tr.span.span.a.contents[0]
 		price = tr.find("td", {"class" : re.compile("alignRight nowrap.*")}).contents[0].replace(' &#x20AC;','').replace(',','.')
 		countryName=re.search('.*/(.*)\.png', tr.span.span.nextSibling.nextSibling.img.attrs[1][1]).group(1)
-		record = (username, userurl, countryName, price)
+		record = [username, userurl, countryName, float(price), 1, url]
 		records.append(record)
 
-	print records
+	return records
+
+def Cost(order):
+	sellers=[]
+	cost=0
+	for card in order:
+		if ([i for i in card[0] if i in sellers]==[]):
+			sellers.append([card[0], card[2], card[4],card[3]*card[4]])
+		else:
+			#Just increase the number of cards from this seller
+			idx = [i for i, x in enumerate(sellers) if x==card[0]]
+			print idx
+			sellers[idx][2] += card[4]
+			sellers[idx][3] += card[4]*card[3]
+		cost+=card[4] * card[3]
+	
+	for seller in sellers:
+		cost+=getShipping(seller[1],seller[3],seller[2],True)
+
+	return cost
 
 
-getCardInfo('http://www.magiccardmarket.eu/Senseis_Divining_Top_(Champions_of_Kamigawa).c1p12179.prod')
+cards =[]
+order =[]
+#cards.append(getCardInfo('http://www.magiccardmarket.eu/Senseis_Divining_Top_(Champions_of_Kamigawa).c1p12179.prod'))
+#cards.append(getCardInfo('http://www.magiccardmarket.eu/Lightning_Greaves_(Friday_Night_Magic_Promos).c1p21792.prod'))
+#cards.append(getCardInfo('http://www.magiccardmarket.eu/Teneb_the_Harvester_(Planar_Chaos).c1p14342.prod'))
+
+cards.append(getCardInfo('http://127.0.0.1/mkmtest/1.html'))
+cards.append(getCardInfo('http://127.0.0.1/mkmtest/2.html'))
+cards.append(getCardInfo('http://127.0.0.1/mkmtest/3.html'))
+cards.append(getCardInfo('http://127.0.0.1/mkmtest/4.html'))
+cards.append(getCardInfo('http://127.0.0.1/mkmtest/5.html'))
+cards.append(getCardInfo('http://127.0.0.1/mkmtest/6.html'))
+
+
+#Start with the cheapest of each card.
+order.append(cards[0][0])
+order.append(cards[1][0])
+order.append(cards[2][0])
+
+#Work out the cost
+
+
+print order
+
+print Cost(order)
+
+MP=np.array([[]])
+
+sellerdict = {}
+
+
+for idx,card in enumerate(cards):
+	#Add a column for this card.
+	MP = np.append(MP, np.zeros( (np.shape(MP)[0], 1) ), 1 )
+	for seller in card:
+		if seller[0] not in sellerdict:
+			sellerdict[seller[0]]=len(sellerdict)
+			#Add a new row to the matrix for this seller
+			MP = np.append(MP, np.zeros( (1, np.shape(MP)[1]) ), 0 )
+			#Insert the price
+			MP[sellerdict[seller[0]]][idx] = seller[3]
+		else:
+			#Insert the price
+			MP[sellerdict[seller[0]]][idx] = seller[3]
+print MP
+#Last row won't have any content, as inserting the first colum into the matrix also inserts a first row, so we're one ahead of ourselves the whole time.
+		
+#Find the minimal prices
+P_min = []
+SV_min = []
+for card in cards:
+	P_min.append(card[0][3])
+	SV_min.append(sellerdict[card[0][0]])
+
+print P_min
+print SV_min
+
+
+	
+
+
+
+
+
 
