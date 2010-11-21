@@ -33,13 +33,11 @@ def max_loc(ar):
 		if (ar[idx]==maxval):
 			return idx
 def getShipping(country, value, number, insurance):
-	return 5
-	
-	#Just for debugging...
+	insured=False
 	if (value > 25 or (insurance ==False and value > 10)):
 		insured = True
 
-	if (country=="DL"):
+	if (country=="D"):
 		if (insured):
 			if (number<=16):
 				return 3.6
@@ -59,7 +57,43 @@ def getShipping(country, value, number, insurance):
 			else:
 				die("How many cards!?")
 	else:
-		return 3.6
+		print "Warning: Unknown country " + country
+		if (insured):
+			if (number<=16):
+				return 3.6
+			elif (number <=186):
+				return 5.9
+			elif (number<=399):
+				return 8.55
+			else:
+				die("How many freaking cards are you buying!?!")
+		else:
+			if (number<=4):
+				return 1
+			elif (number<=16):
+				return 1.55
+			elif (number<=186):
+				return 3.80
+			else:
+				die("How many cards!?")
+		if (insured):
+			if (number<=16):
+				return 3.6
+			elif (number <=186):
+				return 5.9
+			elif (number<=399):
+				return 8.55
+			else:
+				die("How many freaking cards are you buying!?!")
+		else:
+			if (number<=4):
+				return 1
+			elif (number<=16):
+				return 1.55
+			elif (number<=186):
+				return 3.80
+			else:
+				die("How many cards!?")
 
 
 def getCardInfo(url):
@@ -233,10 +267,7 @@ while(True):
 			break
 
 	if (complete):
-		print "Best purchase: "
-		print PV
-		print cost
-		exit()
+		break
 
 	#Unless we're very unlucky, buying as many cards as possible from a single seller is probably good enough. Strictly, should implement FindMinBundle etc.
 
@@ -248,9 +279,7 @@ while(True):
 			gain.append(-999)
 
 	bestSeller= max_loc(gain)
-	print reverse_lookup_seller(sellerdict,bestSeller)
 	bestBundle= np.take(MP, [bestSeller],0)
-	print bestBundle
 	for idx in range(np.shape(bestBundle)[1]):
 		if (bestBundle[0][idx] > 0):
 			PV[idx] = bestSeller
@@ -261,11 +290,13 @@ while(True):
 	cost += BundleCost[bestSeller]
 	#Have we now bought all of our items?
 	if (np.argmax(MP)==0):
-		print "Found solution"
-		print PV
-		print cost
-		exit()
+		break
 
 	
 
 
+print "Best cost found: " + str(cost)
+for idx,card in enumerate(cards):
+	for jdx, seller in enumerate(card):
+		if (seller[0]==reverse_lookup_seller(sellerdict,PV[idx])):
+			print str(seller[5]) + " from " + seller[0]
