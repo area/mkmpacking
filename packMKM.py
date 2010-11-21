@@ -27,7 +27,15 @@ br.set_handle_refresh(mechanize._http.HTTPRefreshProcessor(), max_time=1)
 # User-Agent (this is cheating, ok?)
 br.addheaders = [('User-agent', 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.1) Gecko/2008071615 Fedora/3.0.1-1.fc9 Firefox/3.0.1')]
 
+def max_loc(ar):
+	maxval=max(ar)
+	for idx in range(np.shape(ar)[0]):
+		if (ar[idx]==maxval):
+			return idx
 def getShipping(country, value, number, insurance):
+	return 5
+	
+	#Just for debugging...
 	if (value > 25 or (insurance ==False and value > 10)):
 		insured = True
 
@@ -81,16 +89,20 @@ def Cost(order):
 	sellers=[]
 	cost=0
 	for card in order:
-		if ([i for i in card[0] if i in sellers]==[]):
+		added=False
+		for idx,seller in enumerate(sellers):
+			if (seller[0] == card[0]):
+
+				#Just increase the number of cards from this seller
+				sellers[idx][2] += card[4]
+				sellers[idx][3] += card[4]*card[3]
+				added=True
+				break
+		if(added!=True):
+			#Then we've not had anything yet from this seller
 			sellers.append([card[0], card[2], card[4],card[3]*card[4]])
-		else:
-			#Just increase the number of cards from this seller
-			idx = [i for i, x in enumerate(sellers) if x==card[0]]
-			print idx
-			sellers[idx][2] += card[4]
-			sellers[idx][3] += card[4]*card[3]
+
 		cost+=card[4] * card[3]
-	
 	for seller in sellers:
 		cost+=getShipping(seller[1],seller[3],seller[2],True)
 
@@ -124,10 +136,6 @@ order.append(cards[2][0])
 #Work out the cost
 
 
-print order
-
-print Cost(order)
-
 MP=np.array([[]])
 
 sellerdict = {}
@@ -141,13 +149,17 @@ for idx,card in enumerate(cards):
 			sellerdict[seller[0]]=[len(sellerdict),seller]
 			#Add a new row to the matrix for this seller
 			MP = np.append(MP, np.zeros( (1, np.shape(MP)[1]) ), 0 )
-		#Insert the price
-		MP[sellerdict[seller[0]][0]][idx] = seller[3] + getShipping(seller[2], seller[3], 1, seller[4])
+		#Insert the price - if we don't already have one... some sellers sell multiple copies at different prices; the cheapest one is good enough for us, as we've already done some selection above.
+		if (MP[sellerdict[seller[0]][0]][idx] == 0):
+			MP[sellerdict[seller[0]][0]][idx] = seller[3] + getShipping(seller[2], seller[3], 1, seller[4])
 
 print MP
 
 #Last row won't have any content, as inserting the first colum into the matrix also inserts a first row, so we're one ahead of ourselves the whole time.
-		
+#Delete it.
+
+MP = np.delete(MP,[np.shape(MP)[0]-1],0)
+
 #Find the minimal prices
 P_min = []
 SV_min = []
@@ -165,7 +177,8 @@ for col in range(0,np.shape(MP)[1]):
 
 print P_min
 print SV_min
-
+PV=np.zeros_like(P_min)
+cost=0
 #If we simply buy from the cheapest seller for each item, what's the cost?
 
 order=[]
@@ -177,26 +190,82 @@ for idx,sellerID in enumerate(SV_min):
 
 print "Find a better cost than " +  str(Cost(order))
 
-#Find the sum of the maximal bundle for each seller
+while(True):
+	#Find the sum of the maximal bundle for each seller
+	
+	MaxDiscount = []
+	BundleCost = []
 
-MaxDiscount = []
-BundleCost = []
-
-for row in range(0,np.shape(MP)[0]):
-	order=[]
-	for col in range(0,np.shape(MP)[1]):
-		if (MP[row][col]!=0):
-			#Then this seller sells this good - add to our 'order' to calculate the bundle cost.
-			for seller in cards[col]:
-				if (seller[0] == reverse_lookup_seller(sellerdict, row)):
-					order.append(seller)
-
-	BundleCost.append(Cost(order))
-	MaxDiscount.append(sum(sum(np.take(MP,[row],0))) - BundleCost[row])
-
-
-
+	for row in range(0,np.shape(MP)[0]):
+		order=[]
+		for col in range(0,np.shape(MP)[1]):
+			if (MP[row][col]!=0):
+				#Then this seller sells this good - add to our 'order' to calculate the bundle cost.
+				for seller in cards[col]:
+					if (seller[0] == reverse_lookup_seller(sellerdict, row)):
+						order.append(seller)
+						#This break is here because sometimes the same seller appears on the same page. If this is the case, skip the remaining instances.
+						break
+		BundleCost.append(Cost(order))
+		MaxDiscount.append(sum(sum(np.take(MP,[row],0))) - BundleCost[row])
+	
+	#Calculate MaxSubCost for each seller.
+	MaxSubCost = []
 
 
+	for row in range(0,np.shape(MP)[0]):
+		order=[]
+		for col in range(0,np.shape(MP)[1]):
+			if (MP[row][col]!=0):
+				#Then this seller sells this good.
+				#Add the minimum cost for a product...
+				for seller in cards[col]:
+					if (seller[0] == reverse_lookup_seller(sellerdict, SV_min[col])):
+						order.append(seller)
+						break
+		MaxSubCost.append(Cost(order))
+	
+	
+	complete = True
+	for jdx, SingleBundleCost2 in enumerate(BundleCost):
+		if ((SingleBundleCost2 - MaxSubCost[jdx]) <= 0):
+			complete=False
+			break
+
+	if (complete):
+		print "Best purchase: "
+		print PV
+		print cost
+		exit()
+
+	#Unless we're very unlucky, buying as many cards as possible from a single seller is probably good enough. Strictly, should implement FindMinBundle etc.
+
+	gain=[]
+	for row in range(0,np.shape(MP)[0]):
+		if (MaxSubCost[row]!=0):
+			gain.append((MaxSubCost[row]-BundleCost[row])/MaxSubCost[row])
+		else:
+			gain.append(-999)
+
+	bestSeller= max_loc(gain)
+	print reverse_lookup_seller(sellerdict,bestSeller)
+	bestBundle= np.take(MP, [bestSeller],0)
+	print bestBundle
+	for idx in range(np.shape(bestBundle)[1]):
+		if (bestBundle[0][idx] > 0):
+			PV[idx] = bestSeller
+			#Now set the column containing this item to 0 for all serllers - as we have now decided who to buy it from.a
+			for jdx in range(np.shape(MP)[0]):
+				MP[jdx][idx] = 0
+
+	cost += BundleCost[bestSeller]
+	#Have we now bought all of our items?
+	if (np.argmax(MP)==0):
+		print "Found solution"
+		print PV
+		print cost
+		exit()
+
+	
 
 
