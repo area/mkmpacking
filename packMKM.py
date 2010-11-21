@@ -29,7 +29,7 @@ br.addheaders = [('User-agent', 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.
 
 def getShipping(country, value, number, insurance):
 	if (value > 25 or (insurance ==False and value > 10)):
-		insured = true
+		insured = True
 
 	if (country=="DL"):
 		if (insured):
@@ -96,6 +96,11 @@ def Cost(order):
 
 	return cost
 
+def reverse_lookup_seller(d, v):
+	for k in d:
+        	if d[k][0] == v:
+			return k
+	raise ValueError
 
 cards =[]
 order =[]
@@ -133,29 +138,62 @@ for idx,card in enumerate(cards):
 	MP = np.append(MP, np.zeros( (np.shape(MP)[0], 1) ), 1 )
 	for seller in card:
 		if seller[0] not in sellerdict:
-			sellerdict[seller[0]]=len(sellerdict)
+			sellerdict[seller[0]]=[len(sellerdict),seller]
 			#Add a new row to the matrix for this seller
 			MP = np.append(MP, np.zeros( (1, np.shape(MP)[1]) ), 0 )
-			#Insert the price
-			MP[sellerdict[seller[0]]][idx] = seller[3]
-		else:
-			#Insert the price
-			MP[sellerdict[seller[0]]][idx] = seller[3]
+		#Insert the price
+		MP[sellerdict[seller[0]][0]][idx] = seller[3] + getShipping(seller[2], seller[3], 1, seller[4])
+
 print MP
+
 #Last row won't have any content, as inserting the first colum into the matrix also inserts a first row, so we're one ahead of ourselves the whole time.
 		
 #Find the minimal prices
 P_min = []
 SV_min = []
-for card in cards:
-	P_min.append(card[0][3])
-	SV_min.append(sellerdict[card[0][0]])
+for col in range(0,np.shape(MP)[1]):
+	#Get the minimum price for this column
+	pricemin=999999
+	for row in range(0,np.shape(MP)[0]):
+		if ( (MP[row][col] < pricemin) and (MP[row][col]>0)):
+			sellerRow=row
+			pricemin= MP[row][col]
+	P_min.append(pricemin)
+	SV_min.append(sellerRow)
+
+#print np.take(MP, [0],1)
 
 print P_min
 print SV_min
 
+#If we simply buy from the cheapest seller for each item, what's the cost?
 
-	
+order=[]
+
+for idx,sellerID in enumerate(SV_min):
+	for seller in cards[idx]:
+		if (seller[0] == reverse_lookup_seller(sellerdict, sellerID)):
+			order.append(seller)
+
+print "Find a better cost than " +  str(Cost(order))
+
+#Find the sum of the maximal bundle for each seller
+
+MaxDiscount = []
+BundleCost = []
+
+for row in range(0,np.shape(MP)[0]):
+	order=[]
+	for col in range(0,np.shape(MP)[1]):
+		if (MP[row][col]!=0):
+			#Then this seller sells this good - add to our 'order' to calculate the bundle cost.
+			for seller in cards[col]:
+				if (seller[0] == reverse_lookup_seller(sellerdict, row)):
+					order.append(seller)
+
+	BundleCost.append(Cost(order))
+	MaxDiscount.append(sum(sum(np.take(MP,[row],0))) - BundleCost[row])
+
 
 
 
