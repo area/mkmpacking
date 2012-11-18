@@ -3,4 +3,5 @@
 ##Intro
 A script to generate a reasonably priced combination of sellers to buy cards
 from on Magic Card Market. Put the MKM urls of the cards in a file called
-cardURLS.txt, one per line, and then run with Python. 
+cardURLS.txt, one per line, and then run with Python. The algorithm used is
+similar to that found in http://faculty.cs.tamu.edu/ioerger/ICAI04-linli1.pdf
